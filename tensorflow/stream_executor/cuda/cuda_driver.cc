@@ -126,7 +126,7 @@ PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipCtxSetSharedMemConfig);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipCtxSynchronize);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipDeviceComputeCapability);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipDeviceCanAccessPeer);
-PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipGetDevice); // different syntax cuDeviceGet
+PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipDeviceGet); 
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipDeviceGetAttribute);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipGetDeviceCount); // different syntax cuDeviceGetCount
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipDeviceGetName);
@@ -575,7 +575,7 @@ static port::Status InternalInit() {
 
 /* static */ port::Status CUDADriver::GetDevice(int device_ordinal,
                                                 hipDevice_t *device) {
-  hipError_t res = dynload::hipGetDevice(device);
+  hipError_t res = dynload::hipDeviceGet(device, device_ordinal);
   if (res == hipSuccess) {
     return port::Status::OK();
   }
@@ -1740,14 +1740,8 @@ static port::StatusOr<T> GetSimpleAttribute(hipDevice_t device,
     return false;
   }
 
-#ifdef __HIP_PLATFORM_NVCC__
   hipError_t res = dynload::hipDeviceCanAccessPeer(
       &can_access_peer, from_device.ValueOrDie(), to_device.ValueOrDie());
-#elif defined (__HIP_PLATFORM_HCC__)
-  hipError_t res = dynload::hipDeviceCanAccessPeer(
-      &can_access_peer, from_device.ValueOrDie(), to_device.ValueOrDie());
-      //&can_access_peer, 0, 1);
-#endif
   if (res != hipSuccess) {
     LOG(ERROR) << "failed to detect peer access capability: " << ToString(res);
     return false;

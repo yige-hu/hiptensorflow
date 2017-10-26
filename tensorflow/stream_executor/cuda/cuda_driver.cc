@@ -1740,14 +1740,8 @@ static port::StatusOr<T> GetSimpleAttribute(hipDevice_t device,
     return false;
   }
 
-#ifdef __HIP_PLATFORM_NVCC__
   hipError_t res = dynload::hipDeviceCanAccessPeer(
       &can_access_peer, from_device.ValueOrDie(), to_device.ValueOrDie());
-#elif defined (__HIP_PLATFORM_HCC__)
-  hipError_t res = dynload::hipDeviceCanAccessPeer(
-      &can_access_peer, from_device.ValueOrDie(), to_device.ValueOrDie());
-      //&can_access_peer, 0, 1);
-#endif
   if (res != hipSuccess) {
     LOG(ERROR) << "failed to detect peer access capability: " << ToString(res);
     return false;

@@ -34,13 +34,13 @@ namespace tensorflow {
 //
 // See rccl_ops.cc for example usage, including description of memory
 // management and stream synchronization.
-class NcclManager {
+class RcclManager {
  public:
   typedef std::function<void(Status)> DoneCallback;
-  NcclManager();
-  ~NcclManager();
+  RcclManager();
+  ~RcclManager();
 
-  static NcclManager* instance();
+  static RcclManager* instance();
 
   // Add one participant to an all-reduce, sending in data from <in_t> and
   // receiving the result of the all-reduce in <out_t>.  The device for this
@@ -84,7 +84,7 @@ class NcclManager {
   struct Collective;
   struct Communicator;
   struct CommunicatorMember;
-  struct NcclStream;
+  struct RcclStream;
   struct Participant;
 
   Communicator* GetCommunicator(Collective* collective);
@@ -96,7 +96,7 @@ class NcclManager {
 
   // Run <collective>.  This calls takes ownership of <collective>.
   void RunCollective(const string& key, Collective* collective);
-  void LoopKernelLaunches(NcclStream* stream);
+  void LoopKernelLaunches(RcclStream* stream);
 
   mutex mu_;
 
@@ -108,12 +108,12 @@ class NcclManager {
   // This is used to share the stream across different communicators that
   // include the same device.
   std::map<perftools::gputools::StreamExecutor*,
-           std::vector<std::unique_ptr<NcclStream>>>
+           std::vector<std::unique_ptr<RcclStream>>>
       device_to_comm_streams_ GUARDED_BY(mu_);
 
   std::vector<std::unique_ptr<Communicator>> communicators_;
 
-  TF_DISALLOW_COPY_AND_ASSIGN(NcclManager);
+  TF_DISALLOW_COPY_AND_ASSIGN(RcclManager);
 };
 
 }  // namespace tensorflow

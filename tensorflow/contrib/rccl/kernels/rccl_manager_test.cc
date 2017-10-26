@@ -45,7 +45,7 @@ static std::vector<BaseGPUDevice*> GetGPUDevices() {
   return gpus;
 }
 
-class NcclManagerTest : public ::testing::Test {
+class RcclManagerTest : public ::testing::Test {
  protected:
   static void SetUpTestCase() {
     setenv("RCCL_DEBUG", "INFO", 1 /* replace */);
@@ -145,7 +145,7 @@ class NcclManagerTest : public ::testing::Test {
     return test_case;
   }
 
-  NcclManager::DoneCallback CreateDoneCallback(TestCase* test_case) {
+  RcclManager::DoneCallback CreateDoneCallback(TestCase* test_case) {
     return [this, test_case](Status s) {
       mutex_lock l(test_case->mu);
       ++test_case->num_completed;
@@ -178,10 +178,10 @@ class NcclManagerTest : public ::testing::Test {
     }
   }
 };
-std::vector<BaseGPUDevice*>* NcclManagerTest::devices = nullptr;
+std::vector<BaseGPUDevice*>* RcclManagerTest::devices = nullptr;
 
 // Test basic sum reduction.
-TEST_F(NcclManagerTest, BasicSumReduction) {
+TEST_F(RcclManagerTest, BasicSumReduction) {
   const int num_ranks = 3;
 
   for (int op = 0; op < 4; ++op) {
@@ -192,7 +192,7 @@ TEST_F(NcclManagerTest, BasicSumReduction) {
       auto* device = devices->at(device_num % devices->size());
       auto* event_mgr = device->tensorflow_gpu_device_info()->event_mgr;
       auto* stream = device->tensorflow_gpu_device_info()->stream;
-      NcclManager::instance()->AddToAllReduce(
+      RcclManager::instance()->AddToAllReduce(
           num_ranks, "allreduce", reduction_op, device->executor(), event_mgr,
           stream, &test_case->ins[device_num], &test_case->outs[device_num],
           CreateDoneCallback(test_case.get()));
@@ -210,7 +210,7 @@ TEST_F(NcclManagerTest, BasicSumReduction) {
 // with num_ranks > devices->size(), for some GPUs (e.g. K20m).
 // To test the higher settings, increase num_ranks,
 // num_collectives_per_iteration and time_limit_micros.
-TEST_F(NcclManagerTest, MultipleCallers) {
+TEST_F(RcclManagerTest, MultipleCallers) {
   const int num_ranks = 1;                      // 2;
   const int num_collectives_per_iteration = 1;  // 1000;
   const int num_threads = 3;
@@ -257,7 +257,7 @@ TEST_F(NcclManagerTest, MultipleCallers) {
         auto* event_mgr = device->tensorflow_gpu_device_info()->event_mgr;
         auto* stream = device->tensorflow_gpu_device_info()->stream;
         TestCase* test_case = test_cases[test_num].get();
-        NcclManager::instance()->AddToAllReduce(
+        RcclManager::instance()->AddToAllReduce(
             num_ranks, strings::StrCat("allreduce", test_num), rcclSum,
             device->executor(), event_mgr, stream, &test_case->ins[device_num],
             &test_case->outs[device_num], CreateDoneCallback(test_case));

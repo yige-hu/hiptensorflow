@@ -29,16 +29,16 @@ namespace tensorflow {
 // About memory management and stream syncing:
 // 1. The rccl communicator has a stream for each rank.
 // 2. For input tensors to the communicator, the compute stream is passed to the
-//    NcclManager which will do a needed
+//    RcclManager which will do a needed
 //    communicator_stream.ThenWaitFor(input_tensor_stream).
 // 3. The done_callback of the async kernel is not called by the
-//    NcclManager until after the communicator kernel is complete. This
+//    RcclManager until after the communicator kernel is complete. This
 //    is enough to a) keep the input tensor data valid for the lifetime of the
 //    collective; and b) ensure the data in the output tensor is available
 //    when the async op kernel's done callback is called.
-class NcclAsyncOpBase : public AsyncOpKernel {
+class RcclAsyncOpBase : public AsyncOpKernel {
  public:
-  NcclAsyncOpBase(OpKernelConstruction* c) : AsyncOpKernel(c) {
+  RcclAsyncOpBase(OpKernelConstruction* c) : AsyncOpKernel(c) {
     OP_REQUIRES_OK(c, c->GetAttr("num_devices", &num_devices_));
     OP_REQUIRES_OK(c, c->GetAttr("shared_name", &collective_prefix_));
   }
@@ -55,14 +55,14 @@ class NcclAsyncOpBase : public AsyncOpKernel {
   int num_devices_;
   string collective_prefix_;
 
-  TF_DISALLOW_COPY_AND_ASSIGN(NcclAsyncOpBase);
+  TF_DISALLOW_COPY_AND_ASSIGN(RcclAsyncOpBase);
 };
 
 // To execute a single all-reduce, this kernel is called once for each of the
 // <k> devices in the communicator.
-class NcclAllReduceOpKernel : public NcclAsyncOpBase {
+class RcclAllReduceOpKernel : public RcclAsyncOpBase {
  public:
-  NcclAllReduceOpKernel(OpKernelConstruction* c) : NcclAsyncOpBase(c) {
+  RcclAllReduceOpKernel(OpKernelConstruction* c) : RcclAsyncOpBase(c) {
     string reduction;
     OP_REQUIRES_OK(c, c->GetAttr("reduction", &reduction));
     if (reduction == "min") {
@@ -91,7 +91,7 @@ class NcclAllReduceOpKernel : public NcclAsyncOpBase {
 
     auto* compute_stream = c->op_device_context()->stream();
     EventMgr* event_mgr = c->device()->tensorflow_gpu_device_info()->event_mgr;
-    NcclManager::instance()->AddToAllReduce(
+    RcclManager::instance()->AddToAllReduce(
         num_devices(), GetCollectiveKey(c), reduction_op_,
         compute_stream->parent(), event_mgr, compute_stream, in_t, out_t,
         actual_done);
@@ -101,12 +101,12 @@ class NcclAllReduceOpKernel : public NcclAsyncOpBase {
   rcclRedOp_t reduction_op_;
 };
 
-REGISTER_KERNEL_BUILDER(Name("NcclAllReduce").Device(DEVICE_GPU),
-                        NcclAllReduceOpKernel);
+REGISTER_KERNEL_BUILDER(Name("RcclAllReduce").Device(DEVICE_GPU),
+                        RcclAllReduceOpKernel);
 
-class NcclBroadcastSendKernel : public NcclAsyncOpBase {
+class RcclBroadcastSendKernel : public RcclAsyncOpBase {
  public:
-  NcclBroadcastSendKernel(OpKernelConstruction* c) : NcclAsyncOpBase(c) {}
+  RcclBroadcastSendKernel(OpKernelConstruction* c) : RcclAsyncOpBase(c) {}
 
   void ComputeAsync(OpKernelContext* c, DoneCallback done) override {
     auto actual_done = [c, done](Status s) {
@@ -116,17 +116,17 @@ class NcclBroadcastSendKernel : public NcclAsyncOpBase {
 
     auto* compute_stream = c->op_device_context()->stream();
     EventMgr* event_mgr = c->device()->tensorflow_gpu_device_info()->event_mgr;
-    NcclManager::instance()->AddBroadcastSend(
+    RcclManager::instance()->AddBroadcastSend(
         num_devices(), GetCollectiveKey(c), compute_stream->parent(), event_mgr,
         compute_stream, &c->input(0), std::move(actual_done));
   }
 };
-REGISTER_KERNEL_BUILDER(Name("NcclBroadcastSend").Device(DEVICE_GPU),
-                        NcclBroadcastSendKernel);
+REGISTER_KERNEL_BUILDER(Name("RcclBroadcastSend").Device(DEVICE_GPU),
+                        RcclBroadcastSendKernel);
 
-class NcclBroadcastRecvKernel : public NcclAsyncOpBase {
+class RcclBroadcastRecvKernel : public RcclAsyncOpBase {
  public:
-  NcclBroadcastRecvKernel(OpKernelConstruction* c) : NcclAsyncOpBase(c) {}
+  RcclBroadcastRecvKernel(OpKernelConstruction* c) : RcclAsyncOpBase(c) {}
 
   void ComputeAsync(OpKernelContext* c, DoneCallback done) override {
     const Tensor& shape_t = c->input(0);
@@ -143,14 +143,14 @@ class NcclBroadcastRecvKernel : public NcclAsyncOpBase {
 
     auto* compute_stream = c->op_device_context()->stream();
     EventMgr* event_mgr = c->device()->tensorflow_gpu_device_info()->event_mgr;
-    NcclManager::instance()->AddBroadcastRecv(
+    RcclManager::instance()->AddBroadcastRecv(
         num_devices(), GetCollectiveKey(c), compute_stream->parent(), event_mgr,
         compute_stream, out_t, std::move(actual_done));
   }
 };
 REGISTER_KERNEL_BUILDER(
-    Name("NcclBroadcastRecv").Device(DEVICE_GPU).HostMemory("shape"),
-    NcclBroadcastRecvKernel);
+    Name("RcclBroadcastRecv").Device(DEVICE_GPU).HostMemory("shape"),
+    RcclBroadcastRecvKernel);
 
 }  // namespace tensorflow
 

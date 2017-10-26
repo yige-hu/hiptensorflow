@@ -25,11 +25,11 @@ namespace tensorflow {
 using ::perftools::gputools::cuda::ScopedActivateExecutorContext;
 
 // Contains data for a single stream used for rccl communication; this includes
-// a background thread that calls NcclManager::LoopKernelLaunches.
-struct NcclManager::NcclStream {
+// a background thread that calls RcclManager::LoopKernelLaunches.
+struct RcclManager::RcclStream {
  public:
-  NcclStream() {}
-  ~NcclStream() {
+  RcclStream() {}
+  ~RcclStream() {
     mutex_lock l(mu);
     shutdown_requested = true;
     cv.notify_all();
@@ -41,7 +41,7 @@ struct NcclManager::NcclStream {
   // This is a different stream than the tensorflow compute stream.
   std::unique_ptr<perftools::gputools::Stream> stream;
 
-  // See NcclManager::LoopKernelLaunches for information on these.
+  // See RcclManager::LoopKernelLaunches for information on these.
   std::unique_ptr<Thread> thread;
   mutex mu;
   condition_variable cv;
@@ -50,7 +50,7 @@ struct NcclManager::NcclStream {
   bool shutdown_requested GUARDED_BY(mu) = false;
 };
 
-struct NcclManager::CommunicatorMember {
+struct RcclManager::CommunicatorMember {
  public:
   CommunicatorMember() {}
   ~CommunicatorMember() {
@@ -58,11 +58,11 @@ struct NcclManager::CommunicatorMember {
   }
   rcclComm_t rccl_comm;
 
-  // Owned by NcclManager::device_to_comm_streams_.
-  NcclStream* rccl_stream = nullptr;
+  // Owned by RcclManager::device_to_comm_streams_.
+  RcclStream* rccl_stream = nullptr;
 };
 
-struct NcclManager::Communicator {
+struct RcclManager::Communicator {
  public:
   Communicator(std::vector<CommunicatorMember> members)
       : num_devices(members.size()), members(std::move(members)) {}
@@ -72,7 +72,7 @@ struct NcclManager::Communicator {
 };
 
 namespace {
-rcclDataType_t ToNcclType(DataType t) {
+rcclDataType_t ToRcclType(DataType t) {
   switch (t) {
     case DT_FLOAT:
       return rcclFloat;
@@ -89,11 +89,11 @@ rcclDataType_t ToNcclType(DataType t) {
 }  // namespace
 
 // A participant in a Collective.  See <Collective> below.
-struct NcclManager::Participant {
+struct RcclManager::Participant {
   Participant(const Tensor* in_t, Tensor* out_t, EventMgr* event_mgr,
               perftools::gputools::Stream* tensor_stream,
               perftools::gputools::StreamExecutor* executor,
-              NcclManager::DoneCallback done_callback)
+              RcclManager::DoneCallback done_callback)
       : in_t(in_t),
         out_t(out_t),
         event_mgr(event_mgr),
@@ -122,14 +122,14 @@ struct NcclManager::Participant {
   // process lifetime.
   perftools::gputools::StreamExecutor* executor = nullptr;
 
-  NcclManager::DoneCallback done_callback;
+  RcclManager::DoneCallback done_callback;
 
   bool root = false;
 };
 
 // A Collective tracks a single communicator operation (e.g., a single
 // AllReduce call).
-struct NcclManager::Collective {
+struct RcclManager::Collective {
   Collective(DataType data_type_in, CollectiveType type_in,
              rcclRedOp_t reduction_op_in, int num_devices)
       : data_type(data_type_in),
@@ -148,7 +148,7 @@ struct NcclManager::Collective {
   // All collective participants.
   //
   // Adding values in this vector is guarded by the mutex of the containing
-  // NcclManager.
+  // RcclManager.
   std::vector<std::unique_ptr<Participant>> participants;
 
   // For collective types that have a root (e.g. the root of broadcast is the
@@ -164,15 +164,15 @@ struct NcclManager::Collective {
   mutable std::atomic_int_fast32_t remaining_participants;
 };
 
-NcclManager::NcclManager() {}
-NcclManager::~NcclManager() {}
-NcclManager* NcclManager::instance() {
-  static NcclManager* instance = new NcclManager();
+RcclManager::RcclManager() {}
+RcclManager::~RcclManager() {}
+RcclManager* RcclManager::instance() {
+  static RcclManager* instance = new RcclManager();
   return instance;
 }
 
-NcclManager::Communicator* NcclManager::GetCommunicator(
-    NcclManager::Collective* collective) {
+RcclManager::Communicator* RcclManager::GetCommunicator(
+    RcclManager::Collective* collective) {
   // Sort by executor to make ordering of executors deterministic.
   std::sort(collective->participants.begin(), collective->participants.end(),
             [](const std::unique_ptr<Participant>& a,
@@ -216,7 +216,7 @@ NcclManager::Communicator* NcclManager::GetCommunicator(
   }
 
   auto* env = Env::Default();
-  std::set<NcclStream*> used_streams;
+  std::set<RcclStream*> used_streams;
 
   // Create and initialize a new communicator.
   // Note that this is done under the lock; performance is not expected to
@@ -227,7 +227,7 @@ NcclManager::Communicator* NcclManager::GetCommunicator(
 
     // Find a communication stream to use for the device.
     auto& streams = device_to_comm_streams_[executor];
-    NcclStream* rccl_stream = nullptr;
+    RcclStream* rccl_stream = nullptr;
     for (const auto& s : streams) {
       if (used_streams.insert(s.get()).second) {
         rccl_stream = s.get();
@@ -235,7 +235,7 @@ NcclManager::Communicator* NcclManager::GetCommunicator(
       }
     }
     if (rccl_stream == nullptr) {
-      rccl_stream = new NcclStream();
+      rccl_stream = new RcclStream();
       rccl_stream->executor = executor;
       rccl_stream->stream.reset(new perftools::gputools::Stream(executor));
       rccl_stream->stream->Init();
@@ -278,7 +278,7 @@ NcclManager::Communicator* NcclManager::GetCommunicator(
   return communicators_.back().get();
 }
 
-void NcclManager::AddToAllReduce(int num_devices, const string& key,
+void RcclManager::AddToAllReduce(int num_devices, const string& key,
                                  rcclRedOp_t reduction_op,
                                  perftools::gputools::StreamExecutor* executor,
                                  EventMgr* event_mgr,
@@ -291,7 +291,7 @@ void NcclManager::AddToAllReduce(int num_devices, const string& key,
                  kAllReduce, reduction_op);
 }
 
-void NcclManager::AddBroadcastSend(
+void RcclManager::AddBroadcastSend(
     int num_devices, const string& key,
     perftools::gputools::StreamExecutor* executor, EventMgr* event_mgr,
     perftools::gputools::Stream* tensor_stream, const Tensor* in_t,
@@ -304,7 +304,7 @@ void NcclManager::AddBroadcastSend(
                  kBroadcast, rcclSum /* unused */);
 }
 
-void NcclManager::AddBroadcastRecv(
+void RcclManager::AddBroadcastRecv(
     int num_devices, const string& key,
     perftools::gputools::StreamExecutor* executor, EventMgr* event_mgr,
     perftools::gputools::Stream* tensor_stream, Tensor* out_t,
@@ -316,7 +316,7 @@ void NcclManager::AddBroadcastRecv(
                  kBroadcast, rcclSum /* unused */);
 }
 
-void NcclManager::AddParticipant(int num_devices, const string& key,
+void RcclManager::AddParticipant(int num_devices, const string& key,
                                  std::unique_ptr<Participant> participant,
                                  DataType data_type,
                                  CollectiveType collective_type,
@@ -349,7 +349,7 @@ void NcclManager::AddParticipant(int num_devices, const string& key,
   }
 }
 
-void NcclManager::RunCollective(const string& key, Collective* collective) {
+void RcclManager::RunCollective(const string& key, Collective* collective) {
   static mutex collective_mu;
 
   auto* communicator = GetCommunicator(collective);
@@ -358,7 +358,7 @@ void NcclManager::RunCollective(const string& key, Collective* collective) {
 
   for (int rank = 0; rank < size; ++rank) {
     Participant* p = collective->participants[rank].get();
-    NcclStream* rccl_stream = communicator->members[rank].rccl_stream;
+    RcclStream* rccl_stream = communicator->members[rank].rccl_stream;
     CHECK(rccl_stream != nullptr);
 
     if (p->in_t != nullptr) {
@@ -384,7 +384,7 @@ void NcclManager::RunCollective(const string& key, Collective* collective) {
     // they have non-intersecting sets of devices.
     mutex_lock l(collective_mu);
     for (int rank = 0; rank < size; ++rank) {
-      NcclStream* rccl_stream = communicator->members[rank].rccl_stream;
+      RcclStream* rccl_stream = communicator->members[rank].rccl_stream;
       mutex_lock l(rccl_stream->mu);
       rccl_stream->pending_launches_.push_front(
           std::make_pair(collective, rank));
@@ -393,7 +393,7 @@ void NcclManager::RunCollective(const string& key, Collective* collective) {
   }
 }
 
-void NcclManager::LoopKernelLaunches(NcclStream* rccl_stream) {
+void RcclManager::LoopKernelLaunches(RcclStream* rccl_stream) {
   perftools::gputools::Stream* comm_stream = rccl_stream->stream.get();
   ScopedActivateExecutorContext scoped_context(rccl_stream->executor);
   const hipStream_t* cu_stream = reinterpret_cast<const hipStream_t*>(
@@ -418,7 +418,7 @@ void NcclManager::LoopKernelLaunches(NcclStream* rccl_stream) {
     int rank = next_launch.second;
 
     // Launch the rccl kernel.
-    rcclDataType_t data_type = ToNcclType(collective->data_type);
+    rcclDataType_t data_type = ToRcclType(collective->data_type);
     Participant* p = collective->participants[rank].get();
 
     auto rccl_comm = collective->communicator->members[rank].rccl_comm;

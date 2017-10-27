@@ -308,6 +308,36 @@ if [ "$TF_NEED_HIP" == "1" ]; then
 
   perl -pi -e "s,EIGEN_PATH = ([\\a-z]+\s+\d*),EIGEN_PATH = \"${HIP_EIGEN_PATH}\"\n,s" tensorflow/workspace.bzl
 
+  #setup the logcation of RCCL library
+  while true; do
+    fromuser=""
+    if [ -z "$RCCL_PATH" ]; then
+      default_rccl_path=/opt/rocm/rccl
+      read -p "Please specify the location of RCCL. [Default is $default_rccl_path]: " RCCL_PATH
+      fromuser="1"
+      if [ -z "$RCCL_PATH" ]; then
+        RCCL_PATH=$default_rccl_path
+      fi
+    fi
+    if [ -e "$RCCL_PATH" ]; then
+      export RCCL_PATH
+      break
+    fi
+    echo "Invalid RCCL path. ${RCCL_PATH} cannot be found" 1>&2
+    if [ -z "$fromuser" ]; then
+      exit 1
+    fi
+    RCCL_PATH=""
+    # Retry
+  done
+
+  if [ -e "$RCCL_PATH/lib/librccl.so" ]; then
+      ln -sf $RCCL_PATH/lib/librccl.so third_party/rccl/librccl.so
+  else
+      echo "ERROR: $RCCL_PATH/lib/librccl.so doesn't exist";
+      exit 1
+  fi
+
   if [ "$default_gpu_device" == "NVIDIA" ]; then
     while true; do
       # Configure the Cuda SDK version to use.

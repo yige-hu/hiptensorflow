@@ -960,7 +960,6 @@ def _create_cuda_repository(repository_ctx):
            "%{cudart_lib}": hip_libs["hip"].file_name,
            "%{cublas_lib}": hip_libs["hipblas"].file_name,
            "%{cudnn_lib}": hip_libs["miopen"].file_name,
-           "%{rccl_lib}": hip_libs["rccl"].file_name,
            "%{cufft_lib}": hip_libs["hipfft"].file_name,
            "%{curand_lib}": hip_libs["hiprng"].file_name,
            #"%{cupti_lib}": cuda_libs["cupti"].file_name,

@@ -27,6 +27,7 @@ tf_custom_op_library(
     ],
     deps = [
 	"//tensorflow/core:gpu_headers_lib",
+        "//third_party/rccl:rccl_binary",
     ],
 )
 

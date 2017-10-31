@@ -134,7 +134,7 @@ PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipDeviceGetPCIBusId);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipGetDeviceProperties); // different syntax cuDeviceGetProperties
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipDeviceTotalMem);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipDriverGetVersion);
-PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipEventCreate);
+PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipEventCreateWithFlags);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipEventDestroy);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipEventElapsedTime);
 PERFTOOLS_GPUTOOLS_LIBCUDA_WRAP(hipEventQuery);
@@ -1392,20 +1392,22 @@ CUDADriver::ContextGetSharedMemConfig(CudaContext* context) {
 /* static */ port::Status CUDADriver::CreateEvent(CudaContext* context,
                                                   hipEvent_t *result,
                                                   EventFlags flags) {
-  /*int cuflags;
+  int cuflags;
   switch (flags) {
     case EventFlags::kDefault:
+      // For HIP/ROCm, enesure that events not used for timing synchronize the memory
+      // in addition to the execution flow.
       cuflags = hipEventDefault;
       break;
     case EventFlags::kDisableTiming:
-      cuflags = hipEventDisableTiming;
+      cuflags = hipEventDisableTiming | hipEventReleaseToSystem;
       break;
     default:
       LOG(FATAL) << "impossible event flags: " << int(flags);
-  }*/
+  }
 
   ScopedActivateContext activated{context};
-  hipError_t res = dynload::hipEventCreate(result);
+  hipError_t res = dynload::hipEventCreateWithFlags(result, cuflags);
 
   if (res == hipSuccess) {
     return port::Status::OK();

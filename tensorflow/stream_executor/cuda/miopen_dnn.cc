@@ -1760,32 +1760,31 @@ bool CudnnSupport::DoRnnBackward(
 
 // This is the context required to use the TF scratch allocator:
 struct MIOpenAllocatorContext {
-	  MIOpenAllocatorContext(ScratchAllocator *scratch_allocator, Stream *stream):
-    		scratch_allocator_(scratch_allocator), stream_(stream) {};
+    MIOpenAllocatorContext(ScratchAllocator *scratch_allocator, Stream *stream):
+    scratch_allocator_(scratch_allocator), stream_(stream) {};
 
     ScratchAllocator*   scratch_allocator_;
-    Stream *		stream_;	
+    Stream *stream_;
 };
 
 void *MIOpenAllocatorCallback(void * ctx, size_t size_in_bytes)
 {
-    auto *mac = static_cast<MIOpenAllocatorContext*> (ctx);
-    printf ("TF/MIOpen allocator allocating %zu bytes\n", size_in_bytes);
-    auto allocated = 
-	    mac->scratch_allocator_->AllocateBytes(mac->stream_, size_in_bytes);
+  auto *mac = static_cast<MIOpenAllocatorContext*> (ctx);
+  auto allocated = 
+   mac->scratch_allocator_->AllocateBytes(mac->stream_, size_in_bytes);
 
-    DeviceMemory<uint8> scratch;
-    if (allocated.ok()) {
-      scratch = allocated.ValueOrDie();
-			return scratch.opaque();
-    } else {
-			return nullptr;
-		}
+  DeviceMemory<uint8> scratch;
+  if (allocated.ok()) {
+    scratch = allocated.ValueOrDie();
+    return scratch.opaque();
+  } else {
+    return nullptr;
+  }
 } 
 
 void MIOpenDeallocatorCallback(void * ctx, void *mem)
 {
-    printf ("TF/MIOpen allocator releasing%p\n", mem);
+  // Don't need dealloactor since the TensorFlow heap will automatically reclaim the memory
 }
 
 template <class T>
@@ -1833,8 +1832,8 @@ bool CudnnSupport::DoConvolveImpl(
         SHARED_LOCKS_REQUIRED(dnn_handle_mutex_) -> std::pair<miopenConvFwdAlgorithm_t, size_t> {
 
           assert (scratch_allocator);
-	  MIOpenAllocatorContext mac(scratch_allocator, stream);
-	  dynload::miopenSetAllocator(parent_, ToHandle(dnn_handle_),MIOpenAllocatorCallback,MIOpenDeallocatorCallback,&mac);
+          MIOpenAllocatorContext mac(scratch_allocator, stream);
+          dynload::miopenSetAllocator(parent_, ToHandle(dnn_handle_),MIOpenAllocatorCallback,MIOpenDeallocatorCallback,&mac);
           size_t size_in_bytes;
           status = dynload::miopenConvolutionForwardGetWorkSpaceSize(
               parent_, ToHandle(dnn_handle_), /*filterDesc=*/filter.handle(),
@@ -1859,7 +1858,7 @@ bool CudnnSupport::DoConvolveImpl(
               /*preference=*/&preference, /*workspace*/scratch.opaque(),
               /*WorkSpaceSize*/scratch.size(), /*exhaustiveSearch*/false);
 
-	  // Restore default allocator, note mac is stack temp 
+          // Restore default allocator, note mac is stack temp 
           dynload::miopenSetAllocator(parent_, ToHandle(dnn_handle_),nullptr,nullptr,nullptr);
           CHECK_EQ(status, miopenStatusSuccess)
               << "Unable to find a suitable "
@@ -2493,7 +2492,7 @@ bool CudnnSupport::DoConvolveBackwardFilterImpl(
 
       assert (scratch_allocator);
 
-      MIOpenAllocatorContext mac(scratch_allocator, stream);	  
+      MIOpenAllocatorContext mac(scratch_allocator, stream);
       dynload::miopenSetAllocator(parent_, ToHandle(dnn_handle_),MIOpenAllocatorCallback,MIOpenDeallocatorCallback,&mac);
       size_t size_in_bytes;
       status = dynload::miopenConvolutionBackwardWeightsGetWorkSpaceSize(

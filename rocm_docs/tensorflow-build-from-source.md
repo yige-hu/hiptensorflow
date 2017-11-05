@@ -73,7 +73,7 @@ export PATH="$OPENCL_ROOT/bin:${PATH}"
 
 Build HCC from source, and cleanup the default HCC to avoid issue:
 ```
-sudo rm -rf /opt/rocm/hcc-1.0 && rm -rf /opt/rocm/lib/*.bc
+sudo rm -rf /opt/rocm/hcc-1.0 && sudo rm -rf /opt/rocm/lib/*.bc
 cd ~ && git clone --recursive -b clang_tot_upgrade https://github.com/RadeonOpenCompute/hcc.git
 cd ~ && mkdir -p build.hcc && cd build.hcc && cmake -DCMAKE_BUILD_TYPE=Release ../hcc
 cd ~/build.hcc && make -j $(nproc) && make package && sudo dpkg -i hcc*.deb 
@@ -82,7 +82,7 @@ cd ~/build.hcc && make -j $(nproc) && make package && sudo dpkg -i hcc*.deb
 Build HIP from source:
 ```
 cd ~ && git clone https://github.com/GPUOpen-ProfessionalCompute-Tools/HIP.git
-cd ~/HIP && mkdir -p build && cd build && cmake .. && make package -j && sudo dpkg -i *.deb 
+cd ~/HIP && mkdir -p build && cd build && cmake .. && make package -j$(nproc) && sudo dpkg -i *.deb 
 ```
 
 Setup environment variables, and add those environment variables at the end of ~/.bashrc 

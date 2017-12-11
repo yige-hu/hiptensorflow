@@ -214,6 +214,29 @@ Expected result:
 2017-09-16 20:23:30.809168: Forward-backward across 100 steps, 0.384 +/- 0.002 sec / batch
 ```
 
+### Tensorflow's tf_cnn_benchmarks
+Details on the tf_cnn_benchmarks can be found at this [link](https://github.com/tensorflow/benchmarks/blob/master/scripts/tf_cnn_benchmarks/README.md).  
+
+Here are the basic instructions:
+```
+# Choose your GPU device
+export HIP_VISIBLE_DEVICES=0
+
+# Grab the repo
+cd $HOME
+git clone https://github.com/tensorflow/benchmarks.git
+cd benchmarks
+
+# Temporary workaround to allow support for TF 1.0.1 without NCCL
+git checkout -b oct2 6a33b4a4b5bda950bb7e45faf13120115cbfdb2f
+sed -e '/FLAGS.force_gpu_compatible/ s/^#*/#/' -i ./scripts/tf_cnn_benchmarks/tf_cnn_benchmarks.py
+sed -i 's|from tensorflow.contrib import nccl|#from tensorflow.contrib import nccl|g' ./scripts/tf_cnn_benchmarks/variable_mgr.py
+sed -i 's|from tensorflow.contrib.all_reduce.python import all_reduce|#from tensorflow.contrib.all_reduce.python import all_reduce|g' ./scripts/tf_cnn_benchmarks/variable_mgr.py
+
+# Run the training benchmark (e.g. ResNet-50)
+python ./scripts/tf_cnn_benchmarks/tf_cnn_benchmarks.py --model=resnet50
+```
+
 ## FAQs & tips
 
 ### Temp workaround:  Solutions when running out of memory

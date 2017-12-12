@@ -26,7 +26,6 @@ Here are the basic instructions:
 cd ~/models/tutorials/image/mnist
 
 export HIP_VISIBLE_DEVICES=0
-export HSA_ENABLE_SDMA=0
 python ./convolutional.py 
 ```
 
@@ -71,7 +70,6 @@ Run the training:
 cd ~/models/tutorials/image/cifar10
 
 export HIP_VISIBLE_DEVICES=0
-export HSA_ENABLE_SDMA=0
 python ./cifar10_train.py
 ```
 
@@ -98,7 +96,6 @@ To run the evaluation, follow this:
 cd ~/models/tutorials/image/cifar10
 
 export HIP_VISIBLE_DEVICES=0
-export HSA_ENABLE_SDMA=0
 python ./cifar10_eval.py
 ```
 
@@ -130,7 +127,6 @@ ln -s ./cifar-10-batches-bin ./cifar10
 Train ResNet:
 ```
 export HIP_VISIBLE_DEVICES=0
-export HSA_ENABLE_SDMA=0
 python ./resnet_main.py --train_data_path=cifar10/data_batch* \
                                --log_root=/tmp/resnet_model \
                                --train_dir=/tmp/resnet_model/train \
@@ -156,7 +152,6 @@ Details can be found at this [link]( https://github.com/ROCmSoftwarePlatform/hip
 Here's how to run the classification workload:  
 ```
 export HIP_VISIBLE_DEVICES=0
-export HSA_ENABLE_SDMA=0
 
 cd models/tutorials/image/imagenet
 python ./classify_image.py
@@ -185,7 +180,6 @@ cd hiptensorflow
 rm -f $BENCHDIR/output_*.log
 MODELS="alexnet overfeat vgg googlenet"
 export HIP_VISIBLE_DEVICES=0
-export HSA_ENABLE_SDMA=0
 for m in $MODELS
 do
     python $BENCHDIR/benchmark_${m}.py 2>&1 | tee $BENCHDIR/output_${m}.log
@@ -241,6 +235,3 @@ python ./scripts/tf_cnn_benchmarks/tf_cnn_benchmarks.py --model=resnet50
 
 ### Temp workaround:  Solutions when running out of memory
 As a temporary workaround, if your workload runs out of device memory, you can either reduce the batch size or set `config.gpu_options.allow_growth = True`.
-
-### Temp workaround:  Improving numerical stability
-As a temporary workaround, we currently recommend that you `export HSA_ENABLE_SDMA=0` to improve numerical stability when training Tensorflow models.  
